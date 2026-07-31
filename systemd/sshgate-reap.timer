@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the sshgate reaper every 2 minutes
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=2min
+AccuracySec=15s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

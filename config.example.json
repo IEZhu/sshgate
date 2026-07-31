@@ -1,0 +1,13 @@
+{
+  "_comment": "Copy to /etc/sshgate/config.json and fill in real secrets. NEVER commit the real file.",
+  "totp_secret": "BASE32_TOTP_SECRET_HERE",
+  "url_secret": "LONG_RANDOM_URL_SECRET_HERE",
+  "listen_host": "127.0.0.1",
+  "listen_port": 8787,
+  "open_helper": "/usr/local/sbin/sshgate-open",
+  "logfile": "/var/log/sshgate/access.log",
+  "max_fails": 5,
+  "fail_window": 900,
+  "default_lang": "en",
+  "hold_hours": 24
+}

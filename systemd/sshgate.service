@@ -1,0 +1,18 @@
+[Unit]
+Description=sshgate (secret URL + TOTP -> open firewall for your IP)
+After=network.target
+
+[Service]
+User=sshgate
+Group=sshgate
+ExecStart=/usr/bin/python3 /opt/sshgate/app.py
+Restart=on-failure
+RestartSec=2
+# The service shells out to `sudo` to reach the privileged open-helper,
+# so privilege escalation must remain possible for this unit.
+NoNewPrivileges=false
+PrivateTmp=true
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

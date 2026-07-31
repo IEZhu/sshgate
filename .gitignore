@@ -1,0 +1,10 @@
+# Never commit real secrets or runtime state
+config.json
+access.url
+*.secret
+secrets/
+data/opens/
+
+# Python
+__pycache__/
+*.pyc

@@ -1,0 +1,6 @@
+[Unit]
+Description=sshgate reaper (close openings >=24h old with no active sessions)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/sshgate-reap

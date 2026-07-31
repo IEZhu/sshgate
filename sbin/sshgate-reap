@@ -1,0 +1,33 @@
+#!/bin/bash
+# sshgate-reap - remove an opening only when it is >= HOLD seconds old AND has no
+# active (established) sessions on PORT from that IP. Run periodically by the timer,
+# so access is held at least HOLD, then kept until the last session disconnects.
+set -u
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin:$PATH
+
+PORT="${SSHGATE_PORT:-22}"
+STATE_DIR="${SSHGATE_STATE_DIR:-/var/lib/sshgate/opens}"
+HOLD="${SSHGATE_MIN_AGE:-86400}"   # 24h minimum; override only for testing
+DRYRUN="${SSHGATE_DRYRUN:-0}"
+UFW=/usr/sbin/ufw
+
+now=$(date +%s)
+[ -d "$STATE_DIR" ] || exit 0
+shopt -s nullglob
+
+for f in "$STATE_DIR"/*; do
+  ip=$(basename "$f")
+  [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || continue   # skip junk names
+  epoch=$(head -1 "$f" 2>/dev/null); [[ "$epoch" =~ ^[0-9]+$ ]] || epoch=0
+  age=$(( now - epoch ))
+  active=$(ss -Htn state established dst "$ip" "( sport = :$PORT )" 2>/dev/null | wc -l)
+
+  if (( age >= HOLD && active == 0 )); then
+    if (( DRYRUN )); then echo "would-close $ip (age=${age}s active=0)"; continue; fi
+    "$UFW" delete allow from "$ip" to any port "$PORT" proto tcp >/dev/null 2>&1 || true
+    rm -f "$f"
+    logger -t sshgate "closed tcp/${PORT} for ${ip} (age ${age}s, idle)"
+  else
+    (( DRYRUN )) && echo "keep $ip (age=${age}s active=${active})"
+  fi
+done
