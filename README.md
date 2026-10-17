@@ -4,8 +4,10 @@ Open a firewall port for **your current IP** by visiting a **secret HTTPS link**
 entering a **TOTP** code. No VPN, no client, no agent — just a browser link plus a
 one-time code from your authenticator app.
 
-It is a tiny, dependency-free alternative to port knocking / single-packet
-authorization for **personal, on-demand SSH access** from changing IPs.
+It is a tiny, dependency-free (Python standard library) alternative to port knocking /
+single-packet authorization for **personal, on-demand SSH access** from changing IPs,
+aimed at a single administrator of a self-hosted Linux server with `ufw`, systemd and
+an nginx reverse proxy.
 
 ```
 Browser ──HTTPS──▶ nginx (secret path)  ──▶  sshgate app (localhost, TOTP)

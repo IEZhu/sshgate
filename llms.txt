@@ -1,0 +1,20 @@
+# sshgate
+
+> Open a ufw firewall port for your current IP after a secret HTTPS link and a TOTP code: personal, on-demand SSH access from changing IPs, in pure Python stdlib.
+
+sshgate is a small self-hosted alternative to port knocking and single-packet authorization for one administrator of a Linux server. nginx serves an unguessable secret path and proxies it to a localhost Python app; a valid TOTP code makes a tightly scoped sudo helper add `ufw allow from <ip> to any port 22`. A systemd timer removes the rule once it is at least 24 hours old and no SSH session from that IP is active. The UI ships in English, Russian and Spanish.
+
+## Docs
+
+- [README](https://github.com/IEZhu/sshgate/blob/main/README.md): how it works, security model, install, configuration, limitations
+- [AGENTS.md](https://github.com/IEZhu/sshgate/blob/main/AGENTS.md): layout, conventions and gotchas for coding agents
+- [app.py](https://github.com/IEZhu/sshgate/blob/main/app.py): web app, TOTP check, rate limiting, translations
+- [install.sh](https://github.com/IEZhu/sshgate/blob/main/install.sh): installer that creates the user, secrets, sudoers entry and systemd units
+- [sbin/sshgate-open](https://github.com/IEZhu/sshgate/blob/main/sbin/sshgate-open): privileged helper that opens the port for one IPv4 address
+- [sbin/sshgate-reap](https://github.com/IEZhu/sshgate/blob/main/sbin/sshgate-reap): reaper that closes old, idle openings
+
+## Optional
+
+- [nginx/sshgate.example.conf](https://github.com/IEZhu/sshgate/blob/main/nginx/sshgate.example.conf): reverse-proxy location block
+- [config.example.json](https://github.com/IEZhu/sshgate/blob/main/config.example.json): configuration template
+- [LICENSE](https://github.com/IEZhu/sshgate/blob/main/LICENSE): MIT
