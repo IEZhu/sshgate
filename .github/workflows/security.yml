@@ -21,7 +21,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
         with:
-          version: '0.11.25'
+          version: '0.13.4'
           python-version: '3.13'
           enable-cache: false
       - name: Syntax and offline security behavior (never invokes real sudo or firewall)
@@ -45,7 +45,7 @@ jobs:
           sparse-checkout: python
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
         with:
-          version: '0.11.25'
+          version: '0.13.4'
           python-version: '3.13'
           enable-cache: false
       - name: Every upstream Python security rule, with findings and scan errors blocking
@@ -65,4 +65,7 @@ jobs:
       - name: Prove Markdown secrets block and create strict secret configuration
         run: python3 scripts/check_secret_scanner.py "$RUNNER_TEMP/trivy-secret.yaml"
       - name: All source secret findings block, including Markdown
-        run: trivy --config '' fs --scanners secret --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --ignorefile '' --ignore-policy '' --secret-config "$RUNNER_TEMP/trivy-secret.yaml" --exit-code 1 --no-progress .
+        run: |
+          trivy --config '' fs --scanners secret --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --ignorefile '' --ignore-policy '' --secret-config "$RUNNER_TEMP/trivy-secret.yaml" --exit-code 1 --no-progress . 2> "$RUNNER_TEMP/trivy-scanner.stderr"
+          cat "$RUNNER_TEMP/trivy-scanner.stderr" >&2
+          python3 scripts/check_scanner_errors.py "$RUNNER_TEMP/trivy-scanner.stderr"

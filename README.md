@@ -103,7 +103,7 @@ same keys to `TRANSLATIONS` in [`app.py`](app.py) — nothing else changes.
 
 ## Security checks and local tests
 
-The blocking `security` workflow runs on pull requests, pushes to `main`, daily, and on manual dispatch. It uses a read-only GitHub token, immutable action references, Semgrep 1.182.1 with every official Python security subtree at commit `16b9e6d45f10649f6a531ec4838ed9924372c3bc`, and Trivy 0.76.1. Every source finding, secret finding (including LOW and UNKNOWN), scanner error and test failure blocks the workflow. Repository suppression files and source `nosemgrep` comments cannot disable findings.
+The blocking `security` workflow runs on pull requests, pushes to `main`, daily, and on manual dispatch. It uses a read-only GitHub token, immutable action references, Semgrep 1.182.1 with every official Python security subtree at commit `16b9e6d45f10649f6a531ec4838ed9924372c3bc`, and Trivy 0.76.1. Every source finding, secret finding (including LOW and UNKNOWN), scanner error and test failure blocks the workflow. Scanner lookup errors reported as warnings also block; CI uses uv 0.13.4 with the compromised CA bundle removed. Repository suppression files and source `nosemgrep` comments cannot disable findings.
 
 ```bash
 python3 -m unittest discover -s tests -v
