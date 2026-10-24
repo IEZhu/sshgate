@@ -1,0 +1,66 @@
+name: security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '41 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  behavioral-security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
+        with:
+          version: '0.11.25'
+          python-version: '3.13'
+          enable-cache: false
+      - name: Syntax and offline security behavior (never invokes real sudo or firewall)
+        run: |
+          bash -n install.sh sbin/sshgate-open sbin/sshgate-reap
+          uv run --no-project --isolated python -m unittest discover -s tests -v
+
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: semgrep/semgrep-rules
+          ref: 16b9e6d45f10649f6a531ec4838ed9924372c3bc
+          path: .security-rules
+          persist-credentials: false
+          sparse-checkout: python
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
+        with:
+          version: '0.11.25'
+          python-version: '3.13'
+          enable-cache: false
+      - name: Every upstream Python security rule, with findings and scan errors blocking
+        run: uv run --no-project --isolated --with semgrep==1.182.1 python scripts/scan_source.py .security-rules app.py scripts
+
+  secrets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514
+        with:
+          version: v0.76.1
+          cache: false
+      - name: All source secret findings block, without repository suppressions
+        run: trivy --config '' fs --scanners secret --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --ignorefile '' --secret-config '' --exit-code 1 --no-progress .
