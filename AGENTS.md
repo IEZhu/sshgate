@@ -35,8 +35,7 @@ Runtime paths set by `install.sh` and the code: `/opt/sshgate/app.py`, `/etc/ssh
 (mode 640, owner `sshgate`), `/var/log/sshgate/access.log`, `/var/lib/sshgate/opens/<ip>`,
 `/etc/sudoers.d/sshgate`.
 
-There is no test suite and no CI. Generic syntax checks, not defined by the repo:
-`bash -n install.sh sbin/sshgate-open sbin/sshgate-reap` and `python3 -m py_compile app.py`.
+The blocking `.github/workflows/security.yml` runs offline behavior tests, Python source security rules and source secret scanning. Run `python3 -m unittest discover -s tests -v` and `bash -n install.sh sbin/sshgate-open sbin/sshgate-reap`. Tests fake all privileged commands and temporary state; never use the real firewall or installer for validation. There is no third-party Python dependency inventory.
 `app.py` reads `/etc/sshgate/config.json` at import time, so it cannot be imported or run on a
 machine without that file.
 
@@ -58,10 +57,8 @@ machine without that file.
   `secrets/` and `data/opens/`. Keep placeholders in `config.example.json`.
 - The secret URL path is the first factor: keep `access_log off` in the nginx block and keep
   `log_message` silent in `app.py`, so the path never reaches logs.
-- The app trusts the `X-Real-Client` header for the client IP, so it must stay bound to
-  localhost behind the proxy that sets it.
-- `sshgate-open` accepts IPv4 only, while `app.py` accepts any IP literal; an IPv6 visitor gets
-  "opening the firewall failed".
+- The app accepts one IPv4 `X-Real-Client` header only from a loopback peer. Keep it bound to localhost behind the proxy that replaces that header.
+- Both the app and `sshgate-open` accept IPv4 only; IPv6 visitors receive a bad-request response. TOTP replay prevention and rate limits are in-process and reset at restart.
 - The sudoers entry allows exactly `/usr/local/sbin/sshgate-open`; renaming or moving the helper
   requires changing `install.sh`, `config.example.json` and the sudoers line together.
 - `install.sh` prints a nginx block with port 8787 hardcoded; it does not follow a changed

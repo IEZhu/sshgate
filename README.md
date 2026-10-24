@@ -1,5 +1,7 @@
 # sshgate
 
+[![security](https://github.com/IEZhu/sshgate/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/IEZhu/sshgate/actions/workflows/security.yml)
+
 Open a firewall port for **your current IP** by visiting a **secret HTTPS link** and
 entering a **TOTP** code. No VPN, no client, no agent — just a browser link plus a
 one-time code from your authenticator app.
@@ -32,7 +34,7 @@ opened rule is scoped to the single IP you came from and expires on its own.
    `127.0.0.1:8787`. Anything else on that host returns `404` — the endpoint is invisible
    without the secret.
 2. The app shows a one-field page and verifies a **TOTP** (RFC 6238) second factor,
-   with per-IP rate limiting (5 tries / 15 min).
+   with per-IP rate limiting (5 tries / 15 min). Each accepted TOTP time step can be used once across all client IPs, including simultaneous requests.
 3. On success it calls a small **privileged helper** (`sudo`, tightly scoped) that runs
    `ufw allow from <ip> to any port 22` and records the open time.
 4. A **reaper** (systemd timer, every 2 min) removes the rule only once it is **≥ 24 h old
@@ -98,6 +100,21 @@ same keys to `TRANSLATIONS` in [`app.py`](app.py) — nothing else changes.
 - Opens for the browser's IP: knock and SSH must share one egress IP.
 - One shared secret + one TOTP (personal use).
 - Password-based root SSH is orthogonal — still harden `sshd` (keys, disable root password).
+
+## Security checks and local tests
+
+The blocking `security` workflow runs on pull requests, pushes to `main`, daily, and on manual dispatch. It uses a read-only GitHub token, immutable action references, Semgrep 1.182.1 with every official Python security subtree at commit `16b9e6d45f10649f6a531ec4838ed9924372c3bc`, and Trivy 0.76.1. Every source finding, secret finding (including LOW and UNKNOWN), scanner error and test failure blocks the workflow. Scanner lookup errors reported as warnings also block; CI uses uv 0.13.4 with the compromised CA bundle removed. Repository suppression files and source `nosemgrep` comments cannot disable findings.
+
+```bash
+python3 -m unittest discover -s tests -v
+bash -n install.sh sbin/sshgate-open sbin/sshgate-reap
+```
+
+The dependency-free offline suite checks an RFC TOTP vector, clock drift, malformed codes, concurrent replay, per-IP lockout, trusted loopback proxy headers, request framing, helper argument construction, helper failures, rule deduplication, hold times, active sessions, dry-run behavior and failed session/deletion commands. All process and filesystem boundaries use temporary fakes; the suite never runs real `sudo`, `ufw`, `ss` or the installer. The reaper keeps a rule and its state when session inspection or deletion fails.
+
+There is **no third-party Python SCA inventory**: production imports are standard-library-only and a test enforces that contract. A successful empty vulnerability report would not establish coverage. Trivy scans source secrets, including Markdown, and must detect a generated, unissued token in a temporary README while accepting a clean control; Semgrep scans production Python and CI helpers. Shell syntax and mocked behavior are checked, while nginx, systemd, sudoers, the installed Python interpreter, Linux packages, the deployed host and a real firewall are outside this repository workflow's coverage. Keep those supplied runtimes updated through the host's package management.
+
+The app accepts exactly one valid IPv4 `X-Real-Client` header only from a loopback peer; nginx must replace this header with the trusted visitor address. IPv6 visitors are rejected because the helper opens IPv4 rules. Successful TOTP use is remembered in-process until its accepted clock window expires, including when the helper fails; wait for the next code before retrying. Restarting the app clears replay and rate-limit memory, so those controls do not provide persistent or multi-process protection.
 
 ## License
 

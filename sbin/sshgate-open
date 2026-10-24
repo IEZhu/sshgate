@@ -10,6 +10,9 @@ STATE_DIR="${SSHGATE_STATE_DIR:-/var/lib/sshgate/opens}"
 UFW=/usr/sbin/ufw
 
 IP="${1:-}"
+[[ $# -eq 1 ]] || { echo "one IP argument required" >&2; exit 2; }
+[[ "$PORT" =~ ^[0-9]{1,5}$ ]] && (( 10#$PORT >= 1 && 10#$PORT <= 65535 )) \
+  || { echo "bad port" >&2; exit 2; }
 [[ "$IP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || { echo "bad ip format" >&2; exit 2; }
 for octet in ${IP//./ }; do
   (( 10#$octet >= 0 && 10#$octet <= 255 )) || { echo "bad octet" >&2; exit 2; }
@@ -18,8 +21,12 @@ done
 mkdir -p "$STATE_DIR"
 
 # add the allow rule only if an identical one is not already present (dedup by tuple)
-if ! "$UFW" status | awk -v ip="$IP" -v p="${PORT}/tcp" '$1==p && $2=="ALLOW" && $3==ip {f=1} END{exit !f}'; then
-  out="$("$UFW" insert 1 allow from "$IP" to any port "$PORT" proto tcp comment "sshgate" 2>&1 || true)"
+status="$("$UFW" status)" || { echo "ufw status failed" >&2; exit 3; }
+if ! awk -v ip="$IP" -v p="${PORT}/tcp" '$1==p && $2=="ALLOW" && $3==ip {f=1} END{exit !f}' <<< "$status"; then
+  if ! out="$("$UFW" insert 1 allow from "$IP" to any port "$PORT" proto tcp comment "sshgate" 2>&1)"; then
+    echo "ufw failed: $out" >&2
+    exit 3
+  fi
   echo "$out" | grep -qiE "Rule inserted|Skipping inserting existing rule" \
     || { echo "ufw failed: $out" >&2; exit 3; }
 fi

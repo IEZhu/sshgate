@@ -108,15 +108,26 @@ def totp(now, step=30, digits=6):
 
 def verify_totp(code):
     code = (code or "").strip()
-    if not (code.isdigit() and len(code) == 6):
+    if not (code.isascii() and code.isdigit() and len(code) == 6):
         return False
     now = time.time()
-    return any(hmac.compare_digest(totp(now + drift), code) for drift in (-30, 0, 30))
+    step = int(now // 30)
+    # One shared authenticator: a successful time step may open the gate once,
+    # even if simultaneous requests come from different client IPs.
+    with _lock:
+        _used_steps.intersection_update(range(step - 1, step + 2))
+        matches = [candidate for candidate in range(step - 1, step + 2)
+                   if hmac.compare_digest(totp(candidate * 30), code)]
+        if not matches or any(candidate in _used_steps for candidate in matches):
+            return False
+        _used_steps.update(matches)
+        return True
 
 
 # ------------------------------------------------------------------- rate limiting
 _lock = threading.Lock()
 _fails = {}
+_used_steps = set()
 
 
 def is_locked(ip):
@@ -138,10 +149,17 @@ def clear_fails(ip):
 
 
 def client_ip(handler):
+    # Only the local reverse proxy may assert a visitor's address.
+    try:
+        if not ipaddress.ip_address(handler.client_address[0]).is_loopback:
+            return None
+    except ValueError:
+        return None
+    if len(handler.headers.get_all("X-Real-Client", [])) != 1:
+        return None
     ip = handler.headers.get("X-Real-Client", "").strip()
     try:
-        ipaddress.ip_address(ip)
-        return ip
+        return str(ipaddress.IPv4Address(ip))
     except ValueError:
         return None
 
@@ -229,8 +247,20 @@ class Handler(BaseHTTPRequestHandler):
             log("locked " + ip)
             self._send(429, render(lang, ip, "err", html.escape(t["locked"])))
             return
-        length = int(self.headers.get("Content-Length", 0) or 0)
-        body = self.rfile.read(min(length, 4096)).decode("utf-8", "replace")
+        lengths = self.headers.get_all("Content-Length", [])
+        if (self.headers.get("Transfer-Encoding") or len(lengths) != 1
+                or not lengths[0].isascii() or not lengths[0].isdigit()):
+            self.close_connection = True
+            self._send(400, "bad request")
+            return
+        decimal_length = lengths[0].lstrip("0") or "0"
+        if (len(decimal_length) > 4
+                or len(decimal_length) == 4 and decimal_length > "4096"):
+            self.close_connection = True
+            self._send(413, "request too large")
+            return
+        length = int(decimal_length)
+        body = self.rfile.read(length).decode("utf-8", "replace")
         code = parse_qs(body).get("code", [""])[0]
         if not verify_totp(code):
             record_fail(ip)

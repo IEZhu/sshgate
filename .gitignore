@@ -8,3 +8,4 @@ data/opens/
 # Python
 __pycache__/
 *.pyc
+.cache/
