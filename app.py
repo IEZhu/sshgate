@@ -253,11 +253,13 @@ class Handler(BaseHTTPRequestHandler):
             self.close_connection = True
             self._send(400, "bad request")
             return
-        length = int(lengths[0])
-        if length > 4096:
+        decimal_length = lengths[0].lstrip("0") or "0"
+        if (len(decimal_length) > 4
+                or len(decimal_length) == 4 and decimal_length > "4096"):
             self.close_connection = True
             self._send(413, "request too large")
             return
+        length = int(decimal_length)
         body = self.rfile.read(length).decode("utf-8", "replace")
         code = parse_qs(body).get("code", [""])[0]
         if not verify_totp(code):

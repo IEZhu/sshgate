@@ -62,5 +62,7 @@ jobs:
         with:
           version: v0.76.1
           cache: false
-      - name: All source secret findings block, without repository suppressions
-        run: trivy --config '' fs --scanners secret --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --ignorefile '' --secret-config '' --exit-code 1 --no-progress .
+      - name: Prove Markdown secrets block and create strict secret configuration
+        run: python3 scripts/check_secret_scanner.py "$RUNNER_TEMP/trivy-secret.yaml"
+      - name: All source secret findings block, including Markdown
+        run: trivy --config '' fs --scanners secret --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --ignorefile '' --ignore-policy '' --secret-config "$RUNNER_TEMP/trivy-secret.yaml" --exit-code 1 --no-progress .

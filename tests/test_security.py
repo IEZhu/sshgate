@@ -146,6 +146,22 @@ class ApplicationSecurity(unittest.TestCase):
             self.assertEqual(handler._send.call_args.args[0], 429)
         run.assert_not_called()
 
+    @patch.object(app, "log")
+    @patch.object(app.subprocess, "run")
+    def test_content_length_handles_long_decimal_headers(self, run, _log):
+        for value in ("9" * 5000, "0" * 5000 + "4097"):
+            handler = request()
+            handler.headers.replace_header("Content-Length", value)
+            handler.do_POST()
+            self.assertEqual(handler._send.call_args.args[0], 413)
+            self.assertTrue(handler.close_connection)
+        with patch.object(app, "verify_totp", return_value=False):
+            handler = request()
+            handler.headers.replace_header("Content-Length", "0" * 5000 + "11")
+            handler.do_POST()
+            self.assertEqual(handler._send.call_args.args[0], 401)
+        run.assert_not_called()
+
 
 class HelperLifecycle(unittest.TestCase):
     def setUp(self):
@@ -223,6 +239,18 @@ class HelperLifecycle(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(opening.exists())
         self.assertIn("delete allow from 203.0.113.10 to any port 22 proto tcp", self.calls.read_text())
+
+    def test_reap_decimal_leading_zeros_and_later_files(self):
+        self.env["SSHGATE_MIN_AGE"] = "08"
+        for ip, timestamp in (("203.0.113.10", "08"), ("203.0.113.11", "09"),
+                              ("203.0.113.12", "99999")):
+            (self.state / ip).write_text(timestamp)
+        result = self.run_script("sshgate-reap")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.state / "203.0.113.10").exists())
+        self.assertFalse((self.state / "203.0.113.11").exists())
+        self.assertTrue((self.state / "203.0.113.12").exists())
+        self.assertIn("delete allow from 203.0.113.11", self.calls.read_text())
 
 
 if __name__ == "__main__":

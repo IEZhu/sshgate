@@ -27,14 +27,14 @@ for f in "$STATE_DIR"/*; do
   done
   epoch=$(head -1 "$f" 2>/dev/null) || continue
   [[ "$epoch" =~ ^[0-9]{1,12}$ ]] || continue
-  age=$(( now - epoch ))
+  age=$(( now - 10#$epoch ))
   if ! sessions=$(ss -Htn state established dst "$ip" "( sport = :$PORT )" 2>/dev/null); then
     echo "cannot inspect sessions for $ip; keeping rule" >&2
     continue
   fi
   active=$(printf '%s' "$sessions" | awk 'NF {n++} END {print n+0}')
 
-  if (( age >= HOLD && active == 0 )); then
+  if (( age >= 10#$HOLD && active == 0 )); then
     if (( DRYRUN )); then echo "would-close $ip (age=${age}s active=0)"; continue; fi
     if ! "$UFW" delete allow from "$ip" to any port "$PORT" proto tcp >/dev/null 2>&1; then
       echo "cannot close $ip; keeping state for retry" >&2
